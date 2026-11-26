@@ -1907,3 +1907,24 @@ def test_date_range_htf_daily_stride_includes_aligned_end():
 
     actual = date_range_htf(calendar, "2D", "2026-11-02", "2026-11-02")
     pd.testing.assert_index_equal(actual, pd.DatetimeIndex(["2026-11-02"]).as_unit("ns"))
+
+
+@pytest.mark.parametrize(
+    "stride,start,end",
+    [
+        (2, "2262-04-10", "2262-04-11"),
+        (3, "2262-03-01", "2262-04-11"),
+    ],
+)
+def test_daily_stride_near_timestamp_limit(stride, start, end):
+    calendar = pd.offsets.CustomBusinessDay()
+    expected = pd.bdate_range(start, end)[::stride].as_unit("ns")
+    assert_index_equal(date_range_htf(calendar, f"{stride}D", start, end), expected)
+
+
+def test_daily_stride_uses_effective_business_calendar():
+    import numpy as np
+
+    calendar = pd.offsets.CustomBusinessDay(calendar=np.busdaycalendar(weekmask="1111111"))
+    expected = pd.date_range("2026-11-02", periods=8, freq="2D").as_unit("ns")
+    assert_index_equal(date_range_htf(calendar, "2D", "2026-11-02", "2026-11-16"), expected)

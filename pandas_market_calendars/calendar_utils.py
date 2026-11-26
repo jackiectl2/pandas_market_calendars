@@ -1076,17 +1076,11 @@ def _cal_day_range(cb_day: "CustomBusinessDay", start: Any, end: Any, periods: A
 
     # ---- Start-Date to End-Date ----
     if isinstance(start, pd.Timestamp) and isinstance(end, pd.Timestamp):
-        num_days = (end - start) / mult
-        # Get a better estimate of the number of open days since date_range calc is slow
-        est_open_days = ((num_days // 7) * _days_per_week(cb_day.weekmask)) + num_days % pd.Timedelta("1W")
-
-        # Should always produce a small overestimate since Holidays aren't accounted for.
-        # Include the initial session: start and end are both inclusive.
-        est_open_days = ceil(est_open_days / pd.Timedelta("1D")) + 1
-        _range = pd.RangeIndex(0, est_open_days * mult, mult)
-
-        dt_index = pd.DatetimeIndex(start + _range * cb_day, dtype="datetime64[ns]")
-        return dt_index[dt_index <= end]
+        # Both bounds are rolled to sessions. Count offsets through the end
+        # before constructing timestamps so an extra step cannot overflow.
+        distance = np.busday_count(start.date(), end.date(), busdaycal=cb_day.calendar)
+        offsets = pd.RangeIndex(0, distance + 1, mult * cb_day.n)
+        return pd.DatetimeIndex(start + offsets * cb_day.base, dtype="datetime64[ns]")
 
     # ---- Periods from Start-Date ----
     elif isinstance(start, pd.Timestamp):
